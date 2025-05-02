@@ -20,6 +20,7 @@ pub enum OpCode {
     Write = 0x08,
     Ping = 0x09,
     HardwareVersionGet = 0x0A,
+    FirmwareVersionGet = 0x0B,
     Response = 0x60, // marks the start of a response message
 }
 
@@ -479,4 +480,77 @@ pub fn parse_response<R: Request>(buf: &[u8]) -> crate::Result<R::Response> {
     }
 
     Ok(response)
+}
+
+primitive_enum! {
+    #[derive(Debug, PartialEq, Eq)]
+    pub enum FirmwareType(u8) {
+        Softdevice = 0,
+        Application = 1,
+        Bootloader = 2,
+        Unknown = 0xff,
+    }
+}
+
+pub struct FirmwareVersionRequest(
+    /// Image number
+    ///
+    /// This is a numeric identifier, with values described on
+    /// <https://docs.nordicsemi.com/bundle/sdk_nrf5_v17.1.0/page/lib_dfu_transport.html#lib_dfu_transport_op_fw_version>
+    pub u8,
+);
+
+impl Request for FirmwareVersionRequest {
+    const OPCODE: OpCode = OpCode::FirmwareVersionGet;
+
+    type Response = FirmwareVersionResponse;
+
+    fn write_payload<W: Write>(&self, mut writer: W) -> io::Result<()> {
+        writer.write_u8(self.0)
+    }
+}
+
+pub struct FirmwareVersionResponse {
+    pub type_: Option<FirmwareType>,
+    pub version: u32,
+    pub addr: u32,
+    pub len: u32,
+}
+
+impl core::fmt::Debug for FirmwareVersionResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FirmwareVersionResponse")
+            .field("type", &self.type_)
+            .field("version", &format_args!("{:#08x}", self.version))
+            .field("addr", &format_args!("{:#08x}", self.addr))
+            .field("len", &format_args!("{:#08x}", self.len))
+            .finish()
+    }
+}
+
+impl core::fmt::Display for FirmwareVersionResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(type_) = &self.type_ {
+            write!(f, "{:?}", type_)?
+        } else {
+            write!(f, "unspecified firmware type")?
+        }
+        write!(
+            f,
+            ", version {}. Starting {:#x}, length {}.",
+            self.version, self.addr, self.len
+        )?;
+        Ok(())
+    }
+}
+
+impl Response for FirmwareVersionResponse {
+    fn read_payload<R: Read>(mut response_bytes: R) -> io::Result<Self> {
+        Ok(Self {
+            type_: FirmwareType::from_primitive(response_bytes.read_u8()?),
+            version: response_bytes.read_u32::<LE>()?,
+            addr: response_bytes.read_u32::<LE>()?,
+            len: response_bytes.read_u32::<LE>()?,
+        })
+    }
 }

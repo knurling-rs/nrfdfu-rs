@@ -35,6 +35,10 @@ fn main() {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
+    /// Prints the bootloader and application version, along with their memory areas.
+    #[arg(long)]
+    get_images: bool,
+
     /// File to flash
     elf_path: Option<std::path::PathBuf>,
 }
@@ -48,7 +52,7 @@ fn run() -> Result<()> {
 
     let args = Args::parse();
 
-    let image = if let Some(elf_path) = &args.elf_path {
+    let mut image = if let Some(elf_path) = &args.elf_path {
         let elf = fs::read(elf_path)
             .map_err(|e| format!("couldn't read `{}`: {}", elf_path.to_string_lossy(), e))?;
         Some(elf::read_elf_image(&elf)?)
@@ -105,16 +109,33 @@ fn run() -> Result<()> {
     let hw_version = conn.fetch_hardware_version()?;
     log::debug!("hardware version: {:?}", hw_version);
 
-    if let Some(mut image) = image {
+    if args.get_images {
+        let bootloader_version = conn.fetch_firmware_version(0)?;
+        println!("* image 0: {}", bootloader_version);
+
+        let primary_version = conn.fetch_firmware_version(1)?;
+        println!("* image 1: {}", primary_version);
+
+        if primary_version.type_ == Some(FirmwareType::Softdevice) {
+            let secondary_version = conn.fetch_firmware_version(2)?;
+            println!("* image 2: {:#?}", secondary_version);
+        }
+    }
+
+    if let Some(image) = image.as_mut() {
         // The firmware image must be padded with 0xFF to be a multiple of 4 Bytes. To our knowledge,
         // this is undocumented.
         while image.len() % 4 != 0 {
             image.push(0xff);
         }
 
-        let init_packet = init_packet::build_init_packet(&image);
+        let init_packet = init_packet::build_init_packet(image);
         conn.send_init_packet(&init_packet)?;
-        conn.send_firmware(&image)?;
+        conn.send_firmware(image)?;
+    }
+
+    if image.is_none() && !args.get_images {
+        return Err("No actions performed; provide an .elf file on the command line to flash, or set querying options.".into());
     }
 
     Ok(())
@@ -191,6 +212,10 @@ impl BootloaderConnection {
 
     fn fetch_hardware_version(&mut self) -> Result<HardwareVersionResponse> {
         self.request_response(HardwareVersionRequest)
+    }
+
+    fn fetch_firmware_version(&mut self, image: u8) -> Result<FirmwareVersionResponse> {
+        self.request_response(FirmwareVersionRequest(image))
     }
 
     /// Sends the `.dat` file that's zipped into our firmware DFU .zip(?)
