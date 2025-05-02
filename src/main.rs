@@ -39,6 +39,10 @@ struct Args {
     #[arg(long)]
     get_images: bool,
 
+    /// Selects the USB device with the given serial number
+    #[arg(long)]
+    serial: Option<String>,
+
     /// File to flash
     elf_path: Option<std::path::PathBuf>,
 }
@@ -63,7 +67,14 @@ fn run() -> Result<()> {
     let matching_ports: Vec<_> = available_ports()?
         .into_iter()
         .filter(|port| match &port.port_type {
-            serialport::SerialPortType::UsbPort(usb) => usb.vid == USB_VID && usb.pid == USB_PID,
+            serialport::SerialPortType::UsbPort(usb) => {
+                usb.vid == USB_VID
+                    && usb.pid == USB_PID
+                    && args
+                        .serial
+                        .as_ref()
+                        .is_none_or(|s| Some(s) == usb.serial_number.as_ref())
+            }
             _ => false,
         })
         .collect();
