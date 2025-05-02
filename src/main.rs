@@ -4,6 +4,7 @@ use std::convert::TryInto;
 use std::hash::Hasher;
 use std::time::Duration;
 use std::{error::Error, fs};
+use clap::Parser;
 
 #[macro_use]
 mod macros;
@@ -31,6 +32,12 @@ fn main() {
         }
     }
 }
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// File to flash
+    elf_path: std::path::PathBuf,
+}
 
 fn run() -> Result<()> {
     // We show info and higher levels by default, but allow overriding this via `RUST_LOG`.
@@ -39,12 +46,10 @@ fn run() -> Result<()> {
         .parse_default_env()
         .init();
 
-    let elf_path = std::env::args_os()
-        .skip(1)
-        .next()
-        .ok_or_else(|| format!("missing argument (expected path to ELF file)"))?;
-    let elf = fs::read(&elf_path)
-        .map_err(|e| format!("couldn't read `{}`: {}", elf_path.to_string_lossy(), e))?;
+    let args = Args::parse();
+
+    let elf = fs::read(&args.elf_path)
+        .map_err(|e| format!("couldn't read `{}`: {}", args.elf_path.to_string_lossy(), e))?;
     let mut image = elf::read_elf_image(&elf)?;
 
     let matching_ports: Vec<_> = available_ports()?
