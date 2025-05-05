@@ -43,9 +43,8 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
 
             let contains_section = sections.iter().enumerate().any(|(sidx, section)| {
                 let name = String::from_utf8_lossy(section.name(endian, strings).unwrap());
-                if sidx == 0 {
-                    // to skip the SHN_UNDEF at index 0
-                    assert_eq!(section.sh_type(endian), object::elf::SHT_NULL);
+                if section.sh_type(endian) == object::elf::SHT_NULL {
+                    // Ignore NULL section that would start at 0
                     return false;
                 }
                 let (sec_offset, sec_size) = match section.file_range(endian) {
