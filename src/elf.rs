@@ -41,8 +41,13 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
         if !data.is_empty() && p_type == PT_LOAD {
             let (prog_offset, prog_size) = program.file_range(endian);
 
-            // Note: `skip(1)` to skip the SHN_UNDEF at index 0
-            let contains_section = sections.iter().skip(1).enumerate().any(|(sidx, section)| {
+            let contains_section = sections.iter().enumerate().any(|(sidx, section)| {
+                let name = String::from_utf8_lossy(section.name(endian, strings).unwrap());
+                if sidx == 0 {
+                    // to skip the SHN_UNDEF at index 0
+                    assert_eq!(section.sh_type(endian), object::elf::SHT_NULL);
+                    return false;
+                }
                 let (sec_offset, sec_size) = match section.file_range(endian) {
                     Some(range) => range,
                     None => return false,
@@ -51,7 +56,6 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
                 let contained =
                     sec_offset >= prog_offset && sec_offset + sec_size <= prog_offset + prog_size;
                 if contained {
-                    let name = String::from_utf8_lossy(section.name(endian, strings).unwrap());
                     log::debug!("phdr #{} contains section #{} {}", i, sidx, name);
                 }
                 contained
