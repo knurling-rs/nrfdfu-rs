@@ -61,8 +61,14 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
             });
 
             if contains_section {
+                let flash_addr = program.p_paddr(endian);
+                if flash_addr < 0x1000 {
+                    return Err(format!(
+                        "firmware starts at address {:#x}, expected an address equal or higher than 0x1000 to \
+                         avoid a collision with the bootloader", flash_addr).into());
+                }
                 chunks.push(Chunk {
-                    flash_addr: program.p_paddr(endian),
+                    flash_addr,
                     data,
                 });
             }
@@ -87,11 +93,6 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
     let mut image = Vec::new();
     let mut addr = chunks[0].flash_addr;
     log::debug!("firmware starts at {:#x}", addr);
-    if addr < 0x1000 {
-        return Err(format!(
-            "firmware starts at address {:#x}, expected an address equal or higher than 0x1000 to \
-             avoid a collision with the bootloader", addr).into());
-    }
 
     for chunk in &chunks {
         if chunk.flash_addr < addr {
