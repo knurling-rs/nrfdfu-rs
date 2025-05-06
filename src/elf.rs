@@ -72,15 +72,16 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
                 log::debug!("Program #{i} file range contains section #{} {} (offset in program data: {:#x}), program will be emitted.", sidx, name, offset_in_program_data);
                 found_and_ignore_bytes = core::cmp::min_by_key(
                     found_and_ignore_bytes,
-                    Some(offset_in_program_data),
+                    Some(offset_in_program_data as usize),
                     // Take the smallest that is Some
                     |&x| (!x.is_some(), x)
                 );
             }
 
             if let Some(ignore_bytes) = found_and_ignore_bytes {
-                let flash_addr = program.p_paddr(endian);
-                assert_eq!(ignore_bytes, 0);
+                let mut flash_addr = program.p_paddr(endian);
+                flash_addr += ignore_bytes as u32;
+
                 if flash_addr < 0x1000 {
                     return Err(format!(
                         "firmware starts at address {:#x}, expected an address equal or higher than 0x1000 to \
@@ -88,7 +89,7 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
                 }
                 chunks.push(Chunk {
                     flash_addr,
-                    data,
+                    data: &data[ignore_bytes..],
                 });
             }
         }
