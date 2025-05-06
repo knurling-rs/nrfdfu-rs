@@ -8,6 +8,10 @@ use object::{
 
 use crate::Result;
 
+/// This function effectively does an in-memory `objcopy -O binary ${ELF} ${OUTPUT}` (at least for
+/// the working inputs): Given an ELF file, it produces all bytes of the to-be-loaded program from
+/// the first section, from that byte on. The address of that start is dicarded; any gaps between
+/// programs inside the ELF file are populated with zeros.
 pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
     struct Chunk<'a> {
         flash_addr: u32,
