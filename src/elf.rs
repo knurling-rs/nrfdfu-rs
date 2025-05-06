@@ -40,25 +40,37 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
 
         if !data.is_empty() && p_type == PT_LOAD {
             let (prog_offset, prog_size) = program.file_range(endian);
+            log::debug!("Analyzing PT_LOAD program #{i} in file range {prog_offset}+{prog_size}, physical starting at {:#x}", program.p_paddr(endian));
 
-            let contains_section = sections.iter().enumerate().any(|(sidx, section)| {
+            let mut contains_section = false;
+            for (sidx, section) in sections.iter().enumerate() {
                 let name = String::from_utf8_lossy(section.name(endian, strings).unwrap());
                 if section.sh_type(endian) == object::elf::SHT_NULL {
                     // Ignore NULL section that would start at 0
-                    return false;
+                    log::trace!("Ignoring NULL section ({name:?})");
+                    continue;
                 }
                 let (sec_offset, sec_size) = match section.file_range(endian) {
                     Some(range) => range,
-                    None => return false,
+                    None => {
+                        log::trace!("Ignoring section ({name:?}) without range");
+                        continue;
+                    },
                 };
 
                 let contained =
                     sec_offset >= prog_offset && sec_offset + sec_size <= prog_offset + prog_size;
-                if contained {
-                    log::debug!("phdr #{} contains section #{} {}", i, sidx, name);
+                if !contained {
+                    log::trace!("Section {name:?} is not contained in this program");
+                    continue;
                 }
-                contained
-            });
+
+                let offset_in_program_data = sec_offset - prog_offset;
+
+                log::debug!("Program #{i} file range contains section #{} {} (offset in program data: {:#x}), program will be emitted.", sidx, name, offset_in_program_data);
+                contains_section = true;
+                break;
+            }
 
             if contains_section {
                 let flash_addr = program.p_paddr(endian);
