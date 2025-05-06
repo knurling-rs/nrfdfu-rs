@@ -119,3 +119,25 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
 
     Ok(image)
 }
+
+#[test]
+/// Tests that a program starting at 0x1000 is represented correctly.
+///
+/// When this is flashed onto an nrf52840dongle, the resulting application is recognized by being
+/// enumeratedas "Ferrous Systems" "Test Device" on USB.
+fn starting_at_1000() {
+    let input = std::fs::read("tests/puzzle-fw.elf").unwrap();
+    let output = read_elf_image(&input).unwrap();
+    assert_eq!(output, std::fs::read("tests/puzzle-fw.bin").unwrap());
+}
+
+#[test]
+/// Tests that a program starting at 0x26000 is represented correctly.
+///
+/// The use of such programs is described in
+/// <https://github.com/ferrous-systems/nrfdfu-rs/issues/14>.
+fn starting_late() {
+    let input = std::fs::read("tests/blinky.elf").unwrap();
+    let output = read_elf_image(&input).unwrap();
+    assert_eq!(output, std::fs::read("tests/blinky.bin").unwrap());
+}
