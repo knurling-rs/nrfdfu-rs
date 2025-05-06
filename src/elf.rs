@@ -42,7 +42,9 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
             let (prog_offset, prog_size) = program.file_range(endian);
             log::debug!("Analyzing PT_LOAD program #{i} in file range {prog_offset}+{prog_size}, physical starting at {:#x}", program.p_paddr(endian));
 
-            let mut contains_section = false;
+            // Bytes at the start of program that should be ignored because there is no section
+            // mapped to them
+            let mut found_and_ignore_bytes = None;
             for (sidx, section) in sections.iter().enumerate() {
                 let name = String::from_utf8_lossy(section.name(endian, strings).unwrap());
                 if section.sh_type(endian) == object::elf::SHT_NULL {
@@ -68,12 +70,17 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
                 let offset_in_program_data = sec_offset - prog_offset;
 
                 log::debug!("Program #{i} file range contains section #{} {} (offset in program data: {:#x}), program will be emitted.", sidx, name, offset_in_program_data);
-                contains_section = true;
-                break;
+                found_and_ignore_bytes = core::cmp::min_by_key(
+                    found_and_ignore_bytes,
+                    Some(offset_in_program_data),
+                    // Take the smallest that is Some
+                    |&x| (!x.is_some(), x)
+                );
             }
 
-            if contains_section {
+            if let Some(ignore_bytes) = found_and_ignore_bytes {
                 let flash_addr = program.p_paddr(endian);
+                assert_eq!(ignore_bytes, 0);
                 if flash_addr < 0x1000 {
                     return Err(format!(
                         "firmware starts at address {:#x}, expected an address equal or higher than 0x1000 to \
