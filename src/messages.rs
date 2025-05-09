@@ -176,13 +176,14 @@ impl Request for HardwareVersionRequest {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct HardwareVersionResponse {
     // See FICR register docs
-    part: u32,
-    variant: u32,
-    rom_size: u32,
-    ram_size: u32,
-    rom_page_size: u32,
+    pub part: u32,
+    pub variant: u32,
+    pub rom_size: u32,
+    pub ram_size: u32,
+    pub rom_page_size: u32,
 }
 
 impl Response for HardwareVersionResponse {
@@ -210,6 +211,7 @@ impl Request for PingRequest {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct PingResponse(pub u8);
 
 impl Response for PingResponse {
@@ -232,6 +234,7 @@ impl Request for SelectRequest {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct SelectResponse {
     pub max_size: u32,
     pub offset: u32,
@@ -365,6 +368,7 @@ impl Request for CrcRequest {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct CrcResponse {
     pub offset: u32,
     pub crc: u32,
