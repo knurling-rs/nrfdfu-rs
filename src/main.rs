@@ -45,6 +45,10 @@ struct Args {
 
     /// File to flash
     elf_path: Option<std::path::PathBuf>,
+
+    /// Reboots into the application even if no other application was performed.
+    #[arg(long)]
+    abort: bool,
 }
 
 fn run() -> Result<()> {
@@ -145,7 +149,15 @@ fn run() -> Result<()> {
         conn.send_firmware(image)?;
     }
 
-    if image.is_none() && !args.get_images {
+    if args.abort {
+        let abort_result = conn.abort();
+
+        if abort_result.is_ok() {
+            log::warn!("Response received to Abort command (expected USB disconnect)");
+        }
+    }
+
+    if image.is_none() && !args.get_images && !args.abort {
         return Err("No actions performed; provide an .elf file on the command line to flash, or set querying options.".into());
     }
 
@@ -374,5 +386,10 @@ impl BootloaderConnection {
     // tell the target to execute whatever request setup we sent them before
     fn execute(&mut self) -> Result<ExecuteResponse> {
         self.request_response(ExecuteRequest)
+    }
+
+    /// Sends the Abort command, causing a reboot without reflashing.
+    fn abort(&mut self) -> Result<AbortResponse> {
+        self.request_response(AbortRequest)
     }
 }

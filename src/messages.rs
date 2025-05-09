@@ -21,6 +21,7 @@ pub enum OpCode {
     Ping = 0x09,
     HardwareVersionGet = 0x0A,
     FirmwareVersionGet = 0x0B,
+    Abort = 0x0C,
     Response = 0x60, // marks the start of a response message
 }
 
@@ -552,5 +553,25 @@ impl Response for FirmwareVersionResponse {
             addr: response_bytes.read_u32::<LE>()?,
             len: response_bytes.read_u32::<LE>()?,
         })
+    }
+}
+
+pub struct AbortRequest;
+
+impl Request for AbortRequest {
+    const OPCODE: OpCode = OpCode::Abort;
+
+    type Response = AbortResponse;
+
+    fn write_payload<W: Write>(&self, _writer: W) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+pub struct AbortResponse;
+
+impl Response for AbortResponse {
+    fn read_payload<R: Read>(_reader: R) -> io::Result<Self> {
+        Ok(Self)
     }
 }
