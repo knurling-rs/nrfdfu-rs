@@ -176,13 +176,14 @@ impl Request for HardwareVersionRequest {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct HardwareVersionResponse {
     // See FICR register docs
-    part: u32,
-    variant: u32,
-    rom_size: u32,
-    ram_size: u32,
-    rom_page_size: u32,
+    pub part: u32,
+    pub variant: u32,
+    pub rom_size: u32,
+    pub ram_size: u32,
+    pub rom_page_size: u32,
 }
 
 impl Response for HardwareVersionResponse {
@@ -210,6 +211,7 @@ impl Request for PingRequest {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct PingResponse(pub u8);
 
 impl Response for PingResponse {
@@ -232,6 +234,7 @@ impl Request for SelectRequest {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct SelectResponse {
     pub max_size: u32,
     pub offset: u32,
@@ -336,7 +339,7 @@ impl Request for WriteRequest<'_> {
     type Response = WriteResponse;
 
     fn write_payload<W: Write>(&self, mut writer: W) -> io::Result<()> {
-        writer.write(self.request_payload)?;
+        writer.write_all(self.request_payload)?;
         Ok(())
     }
 }
@@ -365,6 +368,7 @@ impl Request for CrcRequest {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct CrcResponse {
     pub offset: u32,
     pub crc: u32,
@@ -453,7 +457,9 @@ pub fn parse_response<R: Request>(buf: &[u8]) -> crate::Result<R::Response> {
                 .into());
             }
             None => {
-                return Err(format!("malformed response (missing extended error byte)").into());
+                return Err("malformed response (missing extended error byte)"
+                    .to_string()
+                    .into());
             }
         },
         code => {
@@ -469,7 +475,7 @@ pub fn parse_response<R: Request>(buf: &[u8]) -> crate::Result<R::Response> {
     let response = R::Response::read_payload(&mut response_bytes)?;
 
     if !response_bytes.is_empty() {
-        return Err(format!("trailing bytes in response").into());
+        return Err("trailing bytes in response".to_string().into());
     }
 
     Ok(response)

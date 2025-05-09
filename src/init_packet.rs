@@ -32,7 +32,7 @@ mod rohs {
         fn write(&self, writer: &mut MessageWriter) {
             // Nested messages are prefixed with their encoded length.
 
-            let prev_buf = mem::replace(&mut writer.buf, Vec::new());
+            let prev_buf = std::mem::take(&mut writer.buf);
             <M as Message>::write(self, writer);
             let message = mem::replace(&mut writer.buf, prev_buf);
             writer.write_varint(message.len() as u64);
