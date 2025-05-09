@@ -4,6 +4,7 @@ use std::convert::TryInto;
 use std::hash::Hasher;
 use std::time::Duration;
 use std::{error::Error, fs};
+use clap::Parser;
 
 #[macro_use]
 mod macros;
@@ -31,6 +32,24 @@ fn main() {
         }
     }
 }
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Prints the bootloader and application version, along with their memory areas.
+    #[arg(long)]
+    get_versions: bool,
+
+    /// Selects the USB device with the given serial number
+    #[arg(long)]
+    serial: Option<String>,
+
+    /// File to flash
+    elf_path: Option<std::path::PathBuf>,
+
+    /// Reboots into the application even if no other application was performed.
+    #[arg(long)]
+    abort: bool,
+}
 
 fn run() -> Result<()> {
     // We show info and higher levels by default, but allow overriding this via `RUST_LOG`.
@@ -39,18 +58,20 @@ fn run() -> Result<()> {
         .parse_default_env()
         .init();
 
-    let elf_path = std::env::args_os()
-        .skip(1)
-        .next()
-        .ok_or_else(|| format!("missing argument (expected path to ELF file)"))?;
-    let elf = fs::read(&elf_path)
-        .map_err(|e| format!("couldn't read `{}`: {}", elf_path.to_string_lossy(), e))?;
-    let mut image = elf::read_elf_image(&elf)?;
+    let args = Args::parse();
+
+    let mut image = if let Some(elf_path) = &args.elf_path {
+        let elf = fs::read(&elf_path)
+            .map_err(|e| format!("couldn't read `{}`: {}", elf_path.to_string_lossy(), e))?;
+        Some(elf::read_elf_image(&elf)?)
+    } else {
+        None
+    };
 
     let matching_ports: Vec<_> = available_ports()?
         .into_iter()
         .filter(|port| match &port.port_type {
-            serialport::SerialPortType::UsbPort(usb) => usb.vid == USB_VID && usb.pid == USB_PID,
+            serialport::SerialPortType::UsbPort(usb) => usb.vid == USB_VID && usb.pid == USB_PID && args.serial.as_ref().is_none_or(|s| Some(s) == usb.serial_number.as_ref()),
             _ => false,
         })
         .collect();
@@ -91,15 +112,40 @@ fn run() -> Result<()> {
     let hw_version = conn.fetch_hardware_version()?;
     log::debug!("hardware version: {:?}", hw_version);
 
-    // The firmware image must be padded with 0xFF to be a multiple of 4 Bytes. To our knowledge,
-    // this is undocumented.
-    while image.len() % 4 != 0 {
-        image.push(0xff);
+    if args.get_versions {
+        let bootloader_version = conn.fetch_firmware_version(0)?;
+        println!("* image 0: {}", bootloader_version);
+
+        let primary_version = conn.fetch_firmware_version(1)?;
+        println!("* image 1: {}", primary_version);
+
+        if primary_version.type_ == Some(FirmwareType::Softdevice) {
+            let secondary_version = conn.fetch_firmware_version(2)?;
+            println!("* image 2: {:#?}", secondary_version);
+        }
     }
 
-    let init_packet = init_packet::build_init_packet(&image);
-    conn.send_init_packet(&init_packet)?;
-    conn.send_firmware(&image)?;
+    if let Some(image) = image.as_mut() {
+        // The firmware image must be padded with 0xFF to be a multiple of 4 Bytes. To our knowledge,
+        // this is undocumented.
+        while image.len() % 4 != 0 {
+            image.push(0xff);
+        }
+
+        let init_packet = init_packet::build_init_packet(&image);
+        conn.send_init_packet(&init_packet)?;
+        conn.send_firmware(&image)?;
+    }
+
+    if args.abort {
+        if conn.abort().is_ok() {
+            log::warn!("Response received to Abort command (expected USB disconnect)");
+        }
+    }
+
+    if image.is_none() && !args.get_versions && !args.abort {
+        return Err("No actions performed; provide an .elf file on the command line to flash, or set querying options.".into());
+    }
 
     Ok(())
 }
@@ -175,6 +221,10 @@ impl BootloaderConnection {
 
     fn fetch_hardware_version(&mut self) -> Result<HardwareVersionResponse> {
         self.request_response(HardwareVersionRequest)
+    }
+
+    fn fetch_firmware_version(&mut self, image: u8) -> Result<FirmwareVersionResponse> {
+        self.request_response(FirmwareVersionRequest(image))
     }
 
     /// Sends the `.dat` file that's zipped into our firmware DFU .zip(?)
@@ -322,5 +372,10 @@ impl BootloaderConnection {
     // tell the target to execute whatever request setup we sent them before
     fn execute(&mut self) -> Result<ExecuteResponse> {
         self.request_response(ExecuteRequest)
+    }
+
+    /// Sends the Abort command, causing a reboot without reflashing.
+    fn abort(&mut self) -> Result<AbortResponse> {
+        self.request_response(AbortRequest)
     }
 }
