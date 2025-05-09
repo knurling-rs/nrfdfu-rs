@@ -40,9 +40,8 @@ fn run() -> Result<()> {
         .init();
 
     let elf_path = std::env::args_os()
-        .skip(1)
-        .next()
-        .ok_or_else(|| format!("missing argument (expected path to ELF file)"))?;
+        .nth(1)
+        .ok_or_else(|| "missing argument (expected path to ELF file)".to_string())?;
     let elf = fs::read(&elf_path)
         .map_err(|e| format!("couldn't read `{}`: {}", elf_path.to_string_lossy(), e))?;
     let mut image = elf::read_elf_image(&elf)?;
@@ -57,11 +56,12 @@ fn run() -> Result<()> {
 
     let mut port = match matching_ports.len() {
         0 => {
-            return Err(format!(
+            return Err(
                 "no matching USB serial device found.\n       Remember to put the \
                                  device in bootloader mode by pressing the reset button!"
+                    .to_string()
+                    .into(),
             )
-            .into())
         }
         1 => {
             let port = &matching_ports[0].port_name;
@@ -70,7 +70,11 @@ fn run() -> Result<()> {
                 .timeout(Duration::from_millis(1000))
                 .open()?
         }
-        _ => return Err(format!("multiple matching USB serial devices found").into()),
+        _ => {
+            return Err("multiple matching USB serial devices found"
+                .to_string()
+                .into())
+        }
     };
 
     // On Windows, this is required, otherwise communication fails with timeouts

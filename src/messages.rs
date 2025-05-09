@@ -336,7 +336,7 @@ impl Request for WriteRequest<'_> {
     type Response = WriteResponse;
 
     fn write_payload<W: Write>(&self, mut writer: W) -> io::Result<()> {
-        writer.write(self.request_payload)?;
+        writer.write_all(self.request_payload)?;
         Ok(())
     }
 }
@@ -453,7 +453,9 @@ pub fn parse_response<R: Request>(buf: &[u8]) -> crate::Result<R::Response> {
                 .into());
             }
             None => {
-                return Err(format!("malformed response (missing extended error byte)").into());
+                return Err("malformed response (missing extended error byte)"
+                    .to_string()
+                    .into());
             }
         },
         code => {
@@ -469,7 +471,7 @@ pub fn parse_response<R: Request>(buf: &[u8]) -> crate::Result<R::Response> {
     let response = R::Response::read_payload(&mut response_bytes)?;
 
     if !response_bytes.is_empty() {
-        return Err(format!("trailing bytes in response").into());
+        return Err("trailing bytes in response".to_string().into());
     }
 
     Ok(response)
