@@ -1,0 +1,55 @@
+# CI that:
+#
+# * checks the code is formatted correctly
+# * checks the code builds correctly
+# * checks that the tests pass
+# * checks the code has no clippy lints
+
+name: Check
+
+on: [push, pull_request]
+
+env:
+  RUSTFLAGS: "-Dwarnings" 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install pkg-config libudev-dev libusb-1.0-0-dev
+      - name: Build
+        run: cargo build
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Format
+        run: cargo fmt --check
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install pkg-config libudev-dev libusb-1.0-0-dev
+      - name: Test
+        run: cargo test
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Dependencies
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install pkg-config libudev-dev libusb-1.0-0-dev
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features
