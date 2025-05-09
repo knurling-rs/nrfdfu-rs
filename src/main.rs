@@ -1,9 +1,14 @@
-use log::LevelFilter;
-use serialport::{available_ports, SerialPort};
+use std::{error::Error, fs};
 use std::convert::TryInto;
 use std::hash::Hasher;
 use std::time::Duration;
-use std::{error::Error, fs};
+
+use log::LevelFilter;
+use serialport::{available_ports, SerialPort};
+
+use messages::*;
+
+use crate::usb_target::KNOWN_USB_DEVICE_TARGETS;
 
 #[macro_use]
 mod macros;
@@ -11,13 +16,9 @@ mod elf;
 mod init_packet;
 mod messages;
 mod slip;
-
-use messages::*;
+mod usb_target;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
-
-const USB_VID: u16 = 0x1915;
-const USB_PID: u16 = 0x521f;
 
 /// Bootloader protocol version we support.
 const PROTOCOL_VERSION: u8 = 1;
@@ -50,7 +51,7 @@ fn run() -> Result<()> {
     let matching_ports: Vec<_> = available_ports()?
         .into_iter()
         .filter(|port| match &port.port_type {
-            serialport::SerialPortType::UsbPort(usb) => usb.vid == USB_VID && usb.pid == USB_PID,
+            serialport::SerialPortType::UsbPort(usb) => KNOWN_USB_DEVICE_TARGETS.iter().any(|device| { device.vendor_id == usb.vid && device.product_id == usb.pid}) ,
             _ => false,
         })
         .collect();
