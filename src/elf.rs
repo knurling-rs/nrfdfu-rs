@@ -76,7 +76,7 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
                     found_and_ignore_bytes,
                     Some(offset_in_program_data as usize),
                     // Take the smallest that is Some
-                    |&x| (!x.is_some(), x),
+                    |&x| (x.is_none(), x),
                 );
             }
 
