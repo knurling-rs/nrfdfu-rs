@@ -60,10 +60,19 @@ fn run() -> Result<()> {
 
     let args = Args::parse();
 
-    let mut image = if let Some(elf_path) = &args.elf_path {
+    let image = if let Some(elf_path) = &args.elf_path {
         let elf = fs::read(elf_path)
             .map_err(|e| format!("couldn't read `{}`: {}", elf_path.to_string_lossy(), e))?;
-        Some(elf::read_elf_image(&elf)?)
+
+        let mut image = elf::read_elf_image(&elf)?;
+
+        // The firmware image must be padded with 0xFF to be a multiple of 4 Bytes. To our knowledge,
+        // this is undocumented.
+        while image.len() % 4 != 0 {
+            image.push(0xff);
+        }
+
+        Some(image)
     } else {
         None
     };
@@ -132,13 +141,7 @@ fn run() -> Result<()> {
         }
     }
 
-    if let Some(image) = image.as_mut() {
-        // The firmware image must be padded with 0xFF to be a multiple of 4 Bytes. To our knowledge,
-        // this is undocumented.
-        while image.len() % 4 != 0 {
-            image.push(0xff);
-        }
-
+    if let Some(image) = image.as_ref() {
         let init_packet = init_packet::build_init_packet(image);
         conn.send_init_packet(&init_packet)?;
         conn.send_firmware(image)?;
