@@ -1,5 +1,3 @@
-use std::iter;
-
 use object::{
     elf::{FileHeader32, PT_LOAD},
     read::elf::{FileHeader, ProgramHeader, SectionHeader},
@@ -39,7 +37,7 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
     for (i, program) in header.program_headers(endian, elf)?.iter().enumerate() {
         let data = program
             .data(endian, elf)
-            .map_err(|()| format!("failed to load segment data (corrupt ELF?)"))?;
+            .map_err(|()| "failed to load segment data (corrupt ELF?)".to_string())?;
         let p_type = program.p_type(endian);
 
         if !data.is_empty() && p_type == PT_LOAD {
@@ -61,7 +59,7 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
                     None => {
                         log::trace!("Ignoring section ({name:?}) without range");
                         continue;
-                    },
+                    }
                 };
 
                 let contained =
@@ -78,7 +76,7 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
                     found_and_ignore_bytes,
                     Some(offset_in_program_data as usize),
                     // Take the smallest that is Some
-                    |&x| (!x.is_some(), x)
+                    |&x| (x.is_none(), x),
                 );
             }
 
@@ -107,16 +105,25 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
     }
 
     if chunks.is_empty() {
-        return Err(format!(
+        return Err(
             "no loadable program segments found; ensure that the linker is \
             invoked correctly (passing the linker script)"
-        )
-        .into());
+                .to_string()
+                .into(),
+        );
     }
 
     let mut image = Vec::new();
     let mut addr = chunks[0].flash_addr;
     log::debug!("firmware starts at {:#x}", addr);
+    if addr < 0x1000 {
+        return Err(format!(
+            "firmware starts at address {:#x}, expected an address equal or higher than 0x1000 to \
+             avoid a collision with the bootloader",
+            addr
+        )
+        .into());
+    }
 
     for chunk in &chunks {
         if chunk.flash_addr < addr {
@@ -129,7 +136,7 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
 
         // Fill gaps between chunks with 0 bytes.
         let gap = chunk.flash_addr - addr;
-        image.extend(iter::repeat(0).take(gap as usize));
+        image.extend(std::iter::repeat_n(0, gap as usize));
         if gap > 0 {
             log::debug!("0x{:08x}-0x{:08x} (gap)", addr, addr + gap - 1);
         }
