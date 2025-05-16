@@ -92,7 +92,7 @@ fn run() -> Result<()> {
         })
         .collect();
 
-    let port = match matching_ports.len() {
+    match matching_ports.len() {
         0 => {
             return Err(
                 "no matching USB serial device found.\n       Remember to put the \
@@ -100,22 +100,29 @@ fn run() -> Result<()> {
                     .into(),
             )
         }
-        1 => {
-            let port = &matching_ports[0].port_name;
-            log::debug!("opening {} (type {:?})", port, matching_ports[0].port_type);
-            serialport::new(port, 115200)
-                .timeout(Duration::from_millis(1000))
-                .open()?
-        }
+        1 => (),
         _ => return Err("multiple matching USB serial devices found".into()),
     };
 
-    run_on_port(port, &args, image.as_deref())?;
+    for port in matching_ports {
+        run_on_port(port, &args, image.as_deref())?;
+    }
+
+    if image.is_none() && !args.get_images && !args.abort {
+        // This is done at the end so that errors from working on an --all still show up, to
+        // increase the usefulness of RUST_LOG=debug or as a kind of readiness check.
+        return Err("No actions performed; provide an .elf file on the command line to flash, or set querying options.".into());
+    }
 
     Ok(())
 }
 
-fn run_on_port(mut port: Box<dyn SerialPort>, args: &Args, image: Option<&[u8]>) -> Result<()> {
+fn run_on_port(port: serialport::SerialPortInfo, args: &Args, image: Option<&[u8]>) -> Result<()> {
+    log::debug!("opening {} (type {:?})", port.port_name, port.port_type);
+    let mut port = serialport::new(&port.port_name, 115200)
+        .timeout(Duration::from_millis(1000))
+        .open()?;
+
     // On Windows, this is required, otherwise communication fails with timeouts
     // (or just hangs forever).
     port.write_data_terminal_ready(true)?;
@@ -159,10 +166,6 @@ fn run_on_port(mut port: Box<dyn SerialPort>, args: &Args, image: Option<&[u8]>)
         if abort_result.is_ok() {
             log::warn!("Response received to Abort command (expected USB disconnect)");
         }
-    }
-
-    if image.is_none() && !args.get_images && !args.abort {
-        return Err("No actions performed; provide an .elf file on the command line to flash, or set querying options.".into());
     }
 
     Ok(())
