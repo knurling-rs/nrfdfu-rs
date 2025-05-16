@@ -49,6 +49,12 @@ struct Args {
     /// Reboots into the application even if no other application was performed.
     #[arg(long)]
     abort: bool,
+
+    /// Runs the command on *all* recognized devices after printing the port's details.
+    ///
+    /// Errors are accumulated and reported after all ports have been tried.
+    #[arg(long)]
+    all: bool,
 }
 
 fn run() -> Result<()> {
@@ -101,11 +107,31 @@ fn run() -> Result<()> {
             )
         }
         1 => (),
-        _ => return Err("multiple matching USB serial devices found".into()),
+        _ => {
+            if !args.all {
+                return Err("multiple matching USB serial devices found".into());
+            }
+        }
     };
 
+    let mut errors_in_all = false;
+
     for port in matching_ports {
-        run_on_port(port, &args, image.as_deref())?;
+        let result = run_on_port(&port, &args, image.as_deref());
+        if let Err(e) = result {
+            if args.all {
+                // The current port is printed in run_on_port anyway, but it doesn't hurt to be
+                // explicit, especially since stdout and stderr might not be sorted properly.
+                eprintln!("error processing {}: {e}", &port.port_name);
+                errors_in_all = true;
+            } else {
+                return Err(e);
+            }
+        }
+    }
+
+    if errors_in_all {
+        return Err("At least one error occurred on a single port.".into());
     }
 
     if image.is_none() && !args.get_images && !args.abort {
@@ -117,8 +143,23 @@ fn run() -> Result<()> {
     Ok(())
 }
 
-fn run_on_port(port: serialport::SerialPortInfo, args: &Args, image: Option<&[u8]>) -> Result<()> {
+fn run_on_port(port: &serialport::SerialPortInfo, args: &Args, image: Option<&[u8]>) -> Result<()> {
     log::debug!("opening {} (type {:?})", port.port_name, port.port_type);
+    if args.all {
+        let serial = match &port.port_type {
+            serialport::SerialPortType::UsbPort(s) => s.serial_number.as_ref(),
+            // Those don't get through filtering anyway
+            _ => None,
+        };
+        println!(
+            "Found port {} (serial: {})",
+            port.port_name,
+            serial
+                .map(|s| format!("{:?}", s))
+                .unwrap_or("unknown".into())
+        );
+    }
+
     let mut port = serialport::new(&port.port_name, 115200)
         .timeout(Duration::from_millis(1000))
         .open()?;
