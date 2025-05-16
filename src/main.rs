@@ -92,7 +92,7 @@ fn run() -> Result<()> {
         })
         .collect();
 
-    let mut port = match matching_ports.len() {
+    let port = match matching_ports.len() {
         0 => {
             return Err(
                 "no matching USB serial device found.\n       Remember to put the \
@@ -110,6 +110,12 @@ fn run() -> Result<()> {
         _ => return Err("multiple matching USB serial devices found".into()),
     };
 
+    run_on_port(port, &args, image.as_deref())?;
+
+    Ok(())
+}
+
+fn run_on_port(mut port: Box<dyn SerialPort>, args: &Args, image: Option<&[u8]>) -> Result<()> {
     // On Windows, this is required, otherwise communication fails with timeouts
     // (or just hangs forever).
     port.write_data_terminal_ready(true)?;
