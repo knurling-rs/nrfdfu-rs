@@ -88,7 +88,6 @@ fn run() -> Result<()> {
             return Err(
                 "no matching USB serial device found.\n       Remember to put the \
                                  device in bootloader mode by pressing the reset button!"
-                    .to_string()
                     .into(),
             )
         }
@@ -99,11 +98,7 @@ fn run() -> Result<()> {
                 .timeout(Duration::from_millis(1000))
                 .open()?
         }
-        _ => {
-            return Err("multiple matching USB serial devices found"
-                .to_string()
-                .into())
-        }
+        _ => return Err("multiple matching USB serial devices found".into()),
     };
 
     // On Windows, this is required, otherwise communication fails with timeouts
