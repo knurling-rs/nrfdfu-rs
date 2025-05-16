@@ -459,9 +459,7 @@ pub fn parse_response<R: Request>(buf: &[u8]) -> crate::Result<R::Response> {
                 .into());
             }
             None => {
-                return Err("malformed response (missing extended error byte)"
-                    .to_string()
-                    .into());
+                return Err("malformed response (missing extended error byte)".into());
             }
         },
         code => {
@@ -477,7 +475,7 @@ pub fn parse_response<R: Request>(buf: &[u8]) -> crate::Result<R::Response> {
     let response = R::Response::read_payload(&mut response_bytes)?;
 
     if !response_bytes.is_empty() {
-        return Err("trailing bytes in response".to_string().into());
+        return Err("trailing bytes in response".into());
     }
 
     Ok(response)
