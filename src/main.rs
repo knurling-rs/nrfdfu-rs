@@ -27,7 +27,9 @@ fn main() {
     match run() {
         Ok(()) => {}
         Err(e) => {
-            eprintln!("error: {}", e);
+            if e.downcast_ref::<PreviousErrors>().is_none() {
+                eprintln!("error: {}", e);
+            }
             std::process::exit(1);
         }
     }
@@ -56,6 +58,20 @@ struct Args {
     #[arg(long)]
     all: bool,
 }
+
+/// Previouos errors occurred and were printed.
+///
+/// This error is explicitly *not* shown in main (because the errors were printed already).
+#[derive(Debug)]
+struct PreviousErrors;
+
+impl core::fmt::Display for PreviousErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Previous errors occurred")
+    }
+}
+
+impl std::error::Error for PreviousErrors {}
 
 fn run() -> Result<()> {
     // We show info and higher levels by default, but allow overriding this via `RUST_LOG`.
@@ -131,7 +147,7 @@ fn run() -> Result<()> {
     }
 
     if errors_in_all {
-        return Err("At least one error occurred on a single port.".into());
+        return Err(PreviousErrors.into());
     }
 
     if image.is_none() && !args.get_images && !args.abort {
