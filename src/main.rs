@@ -27,7 +27,9 @@ fn main() {
     match run() {
         Ok(()) => {}
         Err(e) => {
-            eprintln!("error: {}", e);
+            if e.downcast_ref::<PreviousErrors>().is_none() {
+                eprintln!("error: {}", e);
+            }
             std::process::exit(1);
         }
     }
@@ -49,7 +51,27 @@ struct Args {
     /// Reboots into the application even if no other application was performed.
     #[arg(long)]
     abort: bool,
+
+    /// Runs the command on *all* recognized devices after printing the port's details.
+    ///
+    /// Errors are accumulated and reported after all ports have been tried.
+    #[arg(long)]
+    all: bool,
 }
+
+/// Previouos errors occurred and were printed.
+///
+/// This error is explicitly *not* shown in main (because the errors were printed already).
+#[derive(Debug)]
+struct PreviousErrors;
+
+impl core::fmt::Display for PreviousErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Previous errors occurred")
+    }
+}
+
+impl std::error::Error for PreviousErrors {}
 
 fn run() -> Result<()> {
     // We show info and higher levels by default, but allow overriding this via `RUST_LOG`.
@@ -60,10 +82,19 @@ fn run() -> Result<()> {
 
     let args = Args::parse();
 
-    let mut image = if let Some(elf_path) = &args.elf_path {
+    let image = if let Some(elf_path) = &args.elf_path {
         let elf = fs::read(elf_path)
             .map_err(|e| format!("couldn't read `{}`: {}", elf_path.to_string_lossy(), e))?;
-        Some(elf::read_elf_image(&elf)?)
+
+        let mut image = elf::read_elf_image(&elf)?;
+
+        // The firmware image must be padded with 0xFF to be a multiple of 4 Bytes. To our knowledge,
+        // this is undocumented.
+        while image.len() % 4 != 0 {
+            image.push(0xff);
+        }
+
+        Some(image)
     } else {
         None
     };
@@ -83,28 +114,71 @@ fn run() -> Result<()> {
         })
         .collect();
 
-    let mut port = match matching_ports.len() {
+    match matching_ports.len() {
         0 => {
             return Err(
                 "no matching USB serial device found.\n       Remember to put the \
                                  device in bootloader mode by pressing the reset button!"
-                    .to_string()
                     .into(),
             )
         }
-        1 => {
-            let port = &matching_ports[0].port_name;
-            log::debug!("opening {} (type {:?})", port, matching_ports[0].port_type);
-            serialport::new(port, 115200)
-                .timeout(Duration::from_millis(1000))
-                .open()?
-        }
+        1 => (),
         _ => {
-            return Err("multiple matching USB serial devices found"
-                .to_string()
-                .into())
+            if !args.all {
+                return Err("multiple matching USB serial devices found".into());
+            }
         }
     };
+
+    let mut errors_in_all = false;
+
+    for port in matching_ports {
+        let result = run_on_port(&port, &args, image.as_deref());
+        if let Err(e) = result {
+            if args.all {
+                // The current port is printed in run_on_port anyway, but it doesn't hurt to be
+                // explicit, especially since stdout and stderr might not be sorted properly.
+                eprintln!("error processing {}: {e}", &port.port_name);
+                errors_in_all = true;
+            } else {
+                return Err(e);
+            }
+        }
+    }
+
+    if errors_in_all {
+        return Err(PreviousErrors.into());
+    }
+
+    if image.is_none() && !args.get_images && !args.abort {
+        // This is done at the end so that errors from working on an --all still show up, to
+        // increase the usefulness of RUST_LOG=debug or as a kind of readiness check.
+        return Err("No actions performed; provide an .elf file on the command line to flash, or set querying options.".into());
+    }
+
+    Ok(())
+}
+
+fn run_on_port(port: &serialport::SerialPortInfo, args: &Args, image: Option<&[u8]>) -> Result<()> {
+    log::debug!("opening {} (type {:?})", port.port_name, port.port_type);
+    if args.all {
+        let serial = match &port.port_type {
+            serialport::SerialPortType::UsbPort(s) => s.serial_number.as_ref(),
+            // Those don't get through filtering anyway
+            _ => None,
+        };
+        println!(
+            "Found port {} (serial: {})",
+            port.port_name,
+            serial
+                .map(|s| format!("{:?}", s))
+                .unwrap_or("unknown".into())
+        );
+    }
+
+    let mut port = serialport::new(&port.port_name, 115200)
+        .timeout(Duration::from_millis(1000))
+        .open()?;
 
     // On Windows, this is required, otherwise communication fails with timeouts
     // (or just hangs forever).
@@ -137,13 +211,7 @@ fn run() -> Result<()> {
         }
     }
 
-    if let Some(image) = image.as_mut() {
-        // The firmware image must be padded with 0xFF to be a multiple of 4 Bytes. To our knowledge,
-        // this is undocumented.
-        while image.len() % 4 != 0 {
-            image.push(0xff);
-        }
-
+    if let Some(image) = image.as_ref() {
         let init_packet = init_packet::build_init_packet(image);
         conn.send_init_packet(&init_packet)?;
         conn.send_firmware(image)?;
@@ -155,10 +223,6 @@ fn run() -> Result<()> {
         if abort_result.is_ok() {
             log::warn!("Response received to Abort command (expected USB disconnect)");
         }
-    }
-
-    if image.is_none() && !args.get_images && !args.abort {
-        return Err("No actions performed; provide an .elf file on the command line to flash, or set querying options.".into());
     }
 
     Ok(())

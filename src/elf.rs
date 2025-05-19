@@ -108,7 +108,6 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
         return Err(
             "no loadable program segments found; ensure that the linker is \
             invoked correctly (passing the linker script)"
-                .to_string()
                 .into(),
         );
     }
