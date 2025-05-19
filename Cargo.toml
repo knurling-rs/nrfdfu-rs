@@ -18,7 +18,7 @@ env_logger = { version = "0.9.0", default-features = false, features = ["termcol
 leb128 = "0.2.4"
 log = "0.4.14"
 object = { version = "0.25.3", default-features = false, features = ["elf", "read_core", "std"] }
-serialport = { package = "ferrous-serialport", version = "4.0.2" }
+serialport = { version = "4.7" }
 sha2 = "0.9.3"
 
 [dev-dependencies]
