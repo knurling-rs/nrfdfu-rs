@@ -103,6 +103,15 @@ fn run() -> Result<()> {
         .into_iter()
         .filter(|port| match &port.port_type {
             serialport::SerialPortType::UsbPort(usb) => {
+                // macOS presents two serial devices - /dev/tty* for receiving
+                // incoming data and /dev/cu for dialling out. We can use
+                // either, but we only want one of them, so hide the /dev/tty
+                // devices.
+                #[cfg(target_os = "macos")]
+                if port.port_name.starts_with("/dev/tty") {
+                    return false;
+                }
+
                 usb.vid == USB_VID
                     && usb.pid == USB_PID
                     && args
