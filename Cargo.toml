@@ -2,8 +2,7 @@
 name = "nrfdfu"
 version = "0.1.3"
 authors = [
-    "Lotte Steenbrink <lotte.steenbrink@ferrous-systems.com>",
-    "Jonas Schievink <jonas.schievink@ferrous-systems.com>",
+    "Jonathan Pallant <jonathan.pallant@ferrous-systems.com>",
 ]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -13,27 +12,14 @@ repository = "https://github.com/ferrous-systems/nrfdfu-rs"
 
 [dependencies]
 byteorder = "1.4.3"
-leb128 = "0.2.4"
-sha2 = "0.9.3"
-log = "0.4.14"
-crc32fast = "1.2.1"
 clap = { version = "4.5.37", features = ["derive", "std", "help"], default-features = false }
-
-[dependencies.env_logger]
-version = "0.9.0"
-default-features = false
-features = ["termcolor", "atty"]
-
-[dependencies.object]
-version = "0.25.3"
-default-features = false
-features = ["elf", "read_core", "std"]
-
-[dependencies.serialport]
-# Note: we are using a fork due compatibility problems.
-# See https://github.com/ferrous-systems/embedded-trainings-2020/issues/148 for more details.
-package = "ferrous-serialport"
-version = "4.0.2"
+crc32fast = "1.2.1"
+env_logger = { version = "0.9.0", default-features = false, features = ["termcolor", "atty"] }
+leb128 = "0.2.4"
+log = "0.4.14"
+object = { version = "0.25.3", default-features = false, features = ["elf", "read_core", "std"] }
+serialport = { package = "ferrous-serialport", version = "4.0.2" }
+sha2 = "0.9.3"
 
 [dev-dependencies]
 expect-test = "1"
