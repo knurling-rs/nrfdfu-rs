@@ -20,7 +20,8 @@ pub fn encode_frame(buf: &[u8], mut writer: impl Write) -> io::Result<()> {
 }
 
 pub fn decode_frame(reader: impl Read, buf: &mut Vec<u8>) -> io::Result<()> {
-    let mut bytes = reader.bytes();
+    let bufreader = std::io::BufReader::new(reader);
+    let mut bytes = bufreader.bytes();
     loop {
         let encoded_byte = match bytes.next() {
             Some(byte) => byte,
