@@ -1,6 +1,6 @@
 [package]
 name = "nrfdfu"
-version = "0.1.3"
+version = "0.2.0"
 authors = [
     "Jonathan Pallant <jonathan.pallant@ferrous-systems.com>",
 ]
@@ -8,18 +8,18 @@ edition = "2018"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 description = "A flashing tool for the nRF bootloader"
-repository = "https://github.com/ferrous-systems/nrfdfu-rs"
+repository = "https://github.com/knurling-rs/nrfdfu-rs"
 
 [dependencies]
 byteorder = "1.4.3"
 clap = { version = "4.5.37", features = ["derive", "std", "help"], default-features = false }
 crc32fast = "1.2.1"
-env_logger = { version = "0.9.0", default-features = false, features = ["termcolor", "atty"] }
+env_logger = "0.11"
 leb128 = "0.2.4"
 log = "0.4.14"
-object = { version = "0.25.3", default-features = false, features = ["elf", "read_core", "std"] }
+object = { version = "0.36", default-features = false, features = ["elf", "read_core", "std"] }
 serialport = { version = "4.7", default-features = false }
-sha2 = "0.9.3"
+sha2 = "0.10"
 
 [dev-dependencies]
 expect-test = "1"

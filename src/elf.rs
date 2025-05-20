@@ -72,7 +72,7 @@ pub fn read_elf_image(elf: &[u8]) -> Result<Vec<u8>> {
                 let offset_in_program_data = sec_offset - prog_offset;
 
                 log::debug!("Program #{i} file range contains section #{} {} (offset in program data: {:#x}), program will be emitted.", sidx, name, offset_in_program_data);
-                found_and_ignore_bytes = core::cmp::min_by_key(
+                found_and_ignore_bytes = std::cmp::min_by_key(
                     found_and_ignore_bytes,
                     Some(offset_in_program_data as usize),
                     // Take the smallest that is Some
