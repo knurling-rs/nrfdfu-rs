@@ -32,7 +32,7 @@ macro_rules! primitive_enum {
             }
         }
 
-        impl ::core::convert::From<$name> for $ty {
+        impl ::std::convert::From<$name> for $ty {
             fn from(value: $name) -> Self {
                 match value {
                     $( $name::$variant => $value, )*

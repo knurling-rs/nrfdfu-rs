@@ -516,7 +516,7 @@ pub struct FirmwareVersionResponse {
     pub len: u32,
 }
 
-impl core::fmt::Debug for FirmwareVersionResponse {
+impl std::fmt::Debug for FirmwareVersionResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FirmwareVersionResponse")
             .field("type", &self.type_)
@@ -527,7 +527,7 @@ impl core::fmt::Debug for FirmwareVersionResponse {
     }
 }
 
-impl core::fmt::Display for FirmwareVersionResponse {
+impl std::fmt::Display for FirmwareVersionResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(type_) = &self.type_ {
             write!(f, "{:?}", type_)?

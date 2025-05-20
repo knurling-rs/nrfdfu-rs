@@ -59,13 +59,13 @@ struct Args {
     all: bool,
 }
 
-/// Previouos errors occurred and were printed.
+/// Previous errors occurred and were printed.
 ///
 /// This error is explicitly *not* shown in main (because the errors were printed already).
 #[derive(Debug)]
 struct PreviousErrors;
 
-impl core::fmt::Display for PreviousErrors {
+impl std::fmt::Display for PreviousErrors {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Previous errors occurred")
     }
