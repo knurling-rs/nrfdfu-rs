@@ -20,6 +20,15 @@ jobs:
         uses: actions/checkout@v4
       - name: Build
         run: cargo build
+  build-announced:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install MSRV
+        run: rustup toolchain add 1.82
+      - name: Build
+        run: cargo +1.82 build
   format-check:
     runs-on: ubuntu-latest
     steps:
