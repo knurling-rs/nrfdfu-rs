@@ -5,6 +5,8 @@ authors = [
     "Jonathan Pallant <jonathan.pallant@ferrous-systems.com>",
 ]
 edition = "2018"
+# Keep in sync with .github/workflows/check.yml
+rust-version = "1.82.0"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 description = "A flashing tool for the nRF bootloader"
